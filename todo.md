@@ -45,9 +45,14 @@
 - [x] Write vitest tests for backend procedures
 - [x] Test voice input functionality
 - [x] Test responsive design
-- [ ] Create checkpoint before presentation webpage
+- [x] Create checkpoint before presentation webpage
 
 ## Presentation Webpage
-- [ ] Create static webpage with interactive visualizations
-- [ ] Include data visualization and charts
-- [ ] Add interactive elements for exploring data
+- [x] Create static webpage with interactive visualizations
+- [x] Include data visualization and charts
+- [x] Add interactive elements for exploring data
+
+## Recent Updates
+- [x] Add checkboxes to strike out completed tasks
+- [x] Remove voice input functionality from Tasks page
+- [x] Update Home page to remove voice quick add button

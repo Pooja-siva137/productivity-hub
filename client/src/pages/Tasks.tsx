@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Trash2, Edit2, Mic, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { Loader2, Plus, Trash2, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
@@ -16,13 +16,9 @@ export default function Tasks() {
   const { isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("medium");
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
 
   const { data: tasks = [], refetch } = trpc.tasks.list.useQuery(undefined, {
     enabled: isAuthenticated,
@@ -62,18 +58,6 @@ export default function Tasks() {
     },
   });
 
-  const transcribeMutation = trpc.voice.transcribe.useMutation({
-    onSuccess: (result: any) => {
-      if (result && result.text) {
-        setTitle(result.text);
-        toast.success("Task added from voice!");
-      }
-    },
-    onError: () => {
-      toast.error("Failed to transcribe audio");
-    },
-  });
-
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       navigate("/login");
@@ -91,52 +75,6 @@ export default function Tasks() {
   if (!isAuthenticated) {
     return null;
   }
-
-  const handleStartRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        chunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const formData = new FormData();
-        formData.append("file", blob, "recording.webm");
-
-        // Upload to S3 and get URL
-        const uploadResponse = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (uploadResponse.ok) {
-          const { url } = await uploadResponse.json();
-          await transcribeMutation.mutateAsync({ audioUrl: url });
-        }
-
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      toast.success("Recording started...");
-    } catch (error) {
-      toast.error("Failed to start recording");
-    }
-  };
-
-  const handleStopRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      toast.success("Recording stopped");
-    }
-  };
 
   const handleAddTask = () => {
     if (!title.trim()) {
@@ -164,6 +102,11 @@ export default function Tasks() {
     }
   };
 
+  const handleCheckboxChange = (task: any) => {
+    const newStatus = task.status === "completed" ? "pending" : "completed";
+    handleStatusChange(task.id, newStatus);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
@@ -183,17 +126,6 @@ export default function Tasks() {
         return "bg-orange-500/20 text-orange-400";
       default:
         return "bg-green-500/20 text-green-400";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckCircle2 className="w-4 h-4" />;
-      case "in-progress":
-        return <Loader2 className="w-4 h-4" />;
-      default:
-        return <Clock className="w-4 h-4" />;
     }
   };
 
@@ -225,7 +157,7 @@ export default function Tasks() {
                 <DialogHeader>
                   <DialogTitle className="text-white">Add New Task</DialogTitle>
                   <DialogDescription className="text-slate-400">
-                    Create a new task or use voice input
+                    Create a new task to manage your productivity
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -266,29 +198,14 @@ export default function Tasks() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleAddTask}
-                      disabled={createMutation.isPending}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700"
-                    >
-                      {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Add Task
-                    </Button>
-                    <Button
-                      onClick={isRecording ? handleStopRecording : handleStartRecording}
-                      variant="outline"
-                      className="border-slate-700 text-slate-300 hover:bg-slate-800"
-                    >
-                      <Mic className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  {isRecording && (
-                    <p className="text-sm text-red-400 flex items-center gap-2">
-                      <span className="animate-pulse">●</span>
-                      Recording...
-                    </p>
-                  )}
+                  <Button
+                    onClick={handleAddTask}
+                    disabled={createMutation.isPending}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  >
+                    {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Add Task
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -317,53 +234,77 @@ export default function Tasks() {
         ) : (
           <div className="grid gap-4">
             {tasks.map((task) => (
-              <Card key={task.id} className="bg-slate-900 border-slate-800 hover:border-slate-700 transition-colors">
+              <Card 
+                key={task.id} 
+                className={`bg-slate-900 border-slate-800 hover:border-slate-700 transition-all ${
+                  task.status === "completed" ? "opacity-75" : ""
+                }`}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-white">{task.title}</h3>
-                        <Badge className={`${getPriorityColor(task.priority)} border`}>
-                          {task.priority}
-                        </Badge>
-                      </div>
-                      {task.description && (
-                        <p className="text-slate-400 text-sm mb-3">{task.description}</p>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={task.status}
-                          onValueChange={(value) =>
-                            handleStatusChange(task.id, value as "pending" | "in-progress" | "completed")
-                          }
+                    {/* Checkbox and Task Content */}
+                    <div className="flex items-start gap-4 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={task.status === "completed"}
+                        onChange={() => handleCheckboxChange(task)}
+                        className="w-5 h-5 mt-1 cursor-pointer accent-blue-500 rounded"
+                      />
+                      <div className="flex-1">
+                        <h3 
+                          className={`text-lg font-semibold ${
+                            task.status === "completed" 
+                              ? "text-slate-500 line-through" 
+                              : "text-white"
+                          }`}
                         >
-                          <SelectTrigger className={`w-40 ${getStatusColor(task.status)} border`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700">
-                            <SelectItem value="pending" className="text-slate-300">
-                              <span className="flex items-center gap-2">
-                                <Clock className="w-4 h-4" />
-                                Pending
-                              </span>
-                            </SelectItem>
-                            <SelectItem value="in-progress" className="text-slate-300">
-                              <span className="flex items-center gap-2">
-                                <Loader2 className="w-4 h-4" />
-                                In Progress
-                              </span>
-                            </SelectItem>
-                            <SelectItem value="completed" className="text-slate-300">
-                              <span className="flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4" />
-                                Completed
-                              </span>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                          {task.title}
+                        </h3>
+                        {task.description && (
+                          <p 
+                            className={`text-sm mt-1 ${
+                              task.status === "completed" 
+                                ? "text-slate-600 line-through" 
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {task.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-3">
+                          <Badge className={`${getPriorityColor(task.priority)} border`}>
+                            {task.priority}
+                          </Badge>
+                          <Badge className={`${getStatusColor(task.status)} border`}>
+                            {task.status === "completed" ? "✓ Completed" : task.status === "in-progress" ? "In Progress" : "Pending"}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+
+                    {/* Status Selector and Delete Button */}
+                    <div className="flex gap-2 items-start">
+                      <Select
+                        value={task.status}
+                        onValueChange={(value) =>
+                          handleStatusChange(task.id, value as "pending" | "in-progress" | "completed")
+                        }
+                      >
+                        <SelectTrigger className={`w-40 ${getStatusColor(task.status)} border`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectItem value="pending" className="text-slate-300">
+                            Pending
+                          </SelectItem>
+                          <SelectItem value="in-progress" className="text-slate-300">
+                            In Progress
+                          </SelectItem>
+                          <SelectItem value="completed" className="text-slate-300">
+                            Completed
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Button
                         variant="ghost"
                         size="sm"

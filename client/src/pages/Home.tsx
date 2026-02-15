@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, CheckCircle2, Clock, Calendar, Mic } from "lucide-react";
+import { Loader2, CheckCircle2, Clock, Calendar } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
@@ -125,7 +125,7 @@ export default function Home() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 gap-6">
           <Card className="bg-slate-900 border-slate-800 hover:border-blue-700/50 transition-all cursor-pointer group">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-white group-hover:text-blue-400 transition-colors">
@@ -158,24 +158,6 @@ export default function Home() {
                 onClick={() => navigate("/calendar")}
               >
                 Open Calendar
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900 border-slate-800 hover:border-blue-700/50 transition-all cursor-pointer group">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white group-hover:text-blue-400 transition-colors">
-                <Mic className="w-5 h-5" />
-                Quick Add
-              </CardTitle>
-              <CardDescription>Add tasks using voice input</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                className="w-full bg-blue-600 hover:bg-blue-700"
-                onClick={() => navigate("/tasks")}
-              >
-                Use Voice
               </Button>
             </CardContent>
           </Card>
