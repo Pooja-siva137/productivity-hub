@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, tasks, InsertTask, reminders, InsertReminder, calendarEvents, InsertCalendarEvent } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,72 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Task management queries
+export async function getUserTasks(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(tasks).where(eq(tasks.userId, userId)).orderBy(tasks.createdAt);
+}
+
+export async function createTask(userId: number, task: Omit<InsertTask, 'userId'>) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.insert(tasks).values({ ...task, userId });
+  return result;
+}
+
+export async function updateTask(taskId: number, updates: Partial<InsertTask>) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.update(tasks).set(updates).where(eq(tasks.id, taskId));
+}
+
+export async function deleteTask(taskId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.delete(tasks).where(eq(tasks.id, taskId));
+}
+
+// Reminder queries
+export async function getUserReminders(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(reminders).where(eq(reminders.userId, userId));
+}
+
+export async function createReminder(userId: number, reminder: Omit<InsertReminder, 'userId'>) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.insert(reminders).values({ ...reminder, userId });
+}
+
+export async function deleteReminder(reminderId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.delete(reminders).where(eq(reminders.id, reminderId));
+}
+
+// Calendar event queries
+export async function getUserCalendarEvents(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(calendarEvents).where(eq(calendarEvents.userId, userId)).orderBy(calendarEvents.startDate);
+}
+
+export async function createCalendarEvent(userId: number, event: Omit<InsertCalendarEvent, 'userId'>) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.insert(calendarEvents).values({ ...event, userId });
+}
+
+export async function updateCalendarEvent(eventId: number, updates: Partial<InsertCalendarEvent>) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.update(calendarEvents).set(updates).where(eq(calendarEvents.id, eventId));
+}
+
+export async function deleteCalendarEvent(eventId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  return db.delete(calendarEvents).where(eq(calendarEvents.id, eventId));
+}
